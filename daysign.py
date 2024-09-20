@@ -50,8 +50,7 @@ AUTO_REPLIES = (
     '给我看硬了！',
     '这个眼神谁顶得住。',
     '妙不可言',
-    '看硬了，确实不错。',
-
+    '看硬了，确实不错。'
 )
 
 
@@ -128,20 +127,11 @@ def daysign(
             print(f'comment to: tid = {tid}, message = {message}')
 
         with _request(method='get', url=f'https://{SEHUATANG_HOST}/plugin.php?id=dd_sign&mod=sign') as r:
-            # id_hash_rsl = re.findall(
-            #     r"updatesecqaa\('(.*?)'", r.text, re.MULTILINE | re.IGNORECASE)
-            # id_hash = id_hash_rsl[0] if id_hash_rsl else 'qS0'  # default value
-
-            # soup = BeautifulSoup(r.text, 'html.parser')
-            # formhash = soup.find('input', {'name': 'formhash'})['value']
-            # signtoken = soup.find('input', {'name': 'signtoken'})['value']
-            # action = soup.find('form', {'name': 'login'})['action']
             pass
 
         with _request(method='get', url=f'https://{SEHUATANG_HOST}/plugin.php?id=dd_sign&ac=sign&infloat=yes&handlekey=pc_click_ddsign&inajax=1&ajaxtarget=fwin_content_pc_click_ddsign') as r:
             soup = BeautifulSoup(r.text, 'xml')
             html = soup.find('root').string
-            # extract argument values from signform
             root = BeautifulSoup(html, 'html.parser')
             id_hash = (root.find('span', id=re.compile(r'^secqaa_'))
                        ['id']).removeprefix('secqaa_')
@@ -152,7 +142,6 @@ def daysign(
                 f'signform values: id_hash={id_hash}, formhash={formhash}, signtoken={signtoken}')
             print(f'action href: {action}')
 
-        # GET: https://www.sehuatang.net/misc.php?mod=secqaa&action=update&idhash=qS0&0.2010053552105764
         with _request(method='get', url=f'https://{SEHUATANG_HOST}/misc.php?mod=secqaa&action=update&idhash={id_hash}&{round(random.random(), 16)}') as r:
             qes_rsl = re.findall(r"'(.*?) = \?'", r.text,
                                  re.MULTILINE | re.IGNORECASE)
@@ -164,7 +153,6 @@ def daysign(
             print(f'verification question: {qes} = {ans}')
             assert type(ans) == int
 
-        # POST: https://www.sehuatang.net/plugin.php?id=dd_sign&mod=sign&signsubmit=yes&signhash=LMAB9&inajax=1
         with _request(method='post', url=f'https://{SEHUATANG_HOST}/{action.lstrip("/")}&inajax=1',
                       data={'formhash': formhash,
                             'signtoken': signtoken,
@@ -228,51 +216,56 @@ def push_notification(title: str, content: str) -> None:
         chat_id = os.getenv('TG_USER_ID')
         bot_token = os.getenv('TG_BOT_TOKEN')
         if chat_id and bot_token:
-            telegram_send_message(f'{title}\n\n{content}', chat_id, bot_token)
+            telegram_send_message(
+                text=f'{title}\n\n{content}',
+                chat_id=chat_id,
+                token=bot_token,
+            )
 
 
 def main():
-
     raw_html = None
-    cookies = {}
 
-    if os.getenv('FETCH_98TANG'):
-        cookies = retrieve_cookies_from_fetch('FETCH_98TANG')
-    elif os.getenv('CURL_98TANG'):
-        cookies = retrieve_cookies_from_curl('CURL_98TANG')
+    # 多个账号 cookies
+    accounts = [
+        retrieve_cookies_from_fetch('FETCH_98TANG_1'),
+        retrieve_cookies_from_fetch('FETCH_98TANG_2'),
+        # 添加更多的账号 cookies
+    ]
 
-    try:
-        raw_html = daysign(
-            cookies=cookies,
-            flaresolverr_url=os.getenv('FLARESOLVERR_URL'),
-            flaresolverr_proxy=os.getenv('FLARESOLVERR_PROXY'),
-        )
+    # 遍历每个账号进行签到
+    for idx, cookies in enumerate(accounts, start=1):
+        try:
+            raw_html = daysign(
+                cookies=cookies,
+                flaresolverr_url=os.getenv('FLARESOLVERR_URL'),
+                flaresolverr_proxy=os.getenv('FLARESOLVERR_PROXY'),
+            )
 
-        if '签到成功' in raw_html:
-            title, message_text = '98堂 每日签到', re.findall(
-                r"'(签到成功.+?)'", raw_html, re.MULTILINE)[0]
-        elif '已经签到' in raw_html:
-            title, message_text = '98堂 每日签到', re.findall(
-                r"'(已经签到.+?)'", raw_html, re.MULTILINE)[0]
-        elif '需要先登录' in raw_html:
-            title, message_text = '98堂 签到异常', f'Cookie无效或已过期，请重新获取'
-        else:
-            title, message_text = '98堂 签到异常', raw_html
-    except IndexError:
-        title, message_text = '98堂 签到异常', f'正则匹配错误'
-    except Exception as e:
-        title, message_text = '98堂 签到异常', f'错误原因：{e}'
-        # log detailed error message
-        traceback.print_exc()
+            if '签到成功' in raw_html:
+                title, message_text = f'98堂 账号{idx} 每日签到', re.findall(
+                    r"'(签到成功.+?)'", raw_html, re.MULTILINE)[0]
+            elif '已经签到' in raw_html:
+                title, message_text = f'98堂 账号{idx} 每日签到', re.findall(
+                    r"'(已经签到.+?)'", raw_html, re.MULTILINE)[0]
+            elif '需要先登录' in raw_html:
+                title, message_text = f'98堂 账号{idx} 签到异常', f'Cookie无效或已过期，请重新获取'
+            else:
+                title, message_text = f'98堂 账号{idx} 签到异常', raw_html
+        except IndexError:
+            title, message_text = f'98堂 账号{idx} 签到异常', f'正则匹配错误'
+        except Exception as e:
+            title, message_text = f'98堂 账号{idx} 签到异常', f'错误原因：{e}'
+            traceback.print_exc()
 
-    # process message data
-    message_text = preprocess_text(message_text)
+        # 处理 message 数据
+        message_text = preprocess_text(message_text)
 
-    # log to output
-    print(message_text)
+        # 输出日志
+        print(message_text)
 
-    # telegram notify
-    push_notification(title, message_text)
+        # 发送通知
+        push_notification(title, message_text)
 
 
 if __name__ == '__main__':
