@@ -236,17 +236,26 @@ def push_notification(title: str, content: str) -> None:
 
 def main():
     raw_html = None
+    cookies_list = []
 
-    # 多个账号 cookies
-    accounts = [
-        retrieve_cookies_from_fetch('FETCH_98TANG_1'),
-        retrieve_cookies_from_fetch('FETCH_98TANG_2'),
-        # 添加更多的账号 cookies
-    ]
+    # 检查是否设置了 FETCH_98TANG_1 和 FETCH_98TANG_2 环境变量
+    fetch_1 = os.getenv('FETCH_98TANG_1')
+    fetch_2 = os.getenv('FETCH_98TANG_2')
 
-    # 遍历每个账号进行签到
-    for idx, cookies in enumerate(accounts, start=1):
-        try:
+    if fetch_1:
+        cookies_list.append(retrieve_cookies_from_fetch('FETCH_98TANG_1'))
+    else:
+        print("环境变量 'FETCH_98TANG_1' 未设置或为空，跳过此账号的签到。")
+
+    if fetch_2:
+        cookies_list.append(retrieve_cookies_from_fetch('FETCH_98TANG_2'))
+    else:
+        print("环境变量 'FETCH_98TANG_2' 未设置或为空，跳过此账号的签到。")
+
+    try:
+        # 对每个cookies进行签到
+        for i, cookies in enumerate(cookies_list, start=1):
+            print(f"开始处理账号{i}的签到")
             raw_html = daysign(
                 cookies=cookies,
                 flaresolverr_url=os.getenv('FLARESOLVERR_URL'),
@@ -254,29 +263,26 @@ def main():
             )
 
             if '签到成功' in raw_html:
-                title, message_text = f'98堂 账号{idx} 每日签到', re.findall(
+                title, message_text = f'98堂账号{i} 每日签到', re.findall(
                     r"'(签到成功.+?)'", raw_html, re.MULTILINE)[0]
             elif '已经签到' in raw_html:
-                title, message_text = f'98堂 账号{idx} 每日签到', re.findall(
+                title, message_text = f'98堂账号{i} 每日签到', re.findall(
                     r"'(已经签到.+?)'", raw_html, re.MULTILINE)[0]
             elif '需要先登录' in raw_html:
-                title, message_text = f'98堂 账号{idx} 签到异常', f'Cookie无效或已过期，请重新获取'
+                title, message_text = f'98堂账号{i} 签到异常', f'Cookie无效或已过期，请重新获取'
             else:
-                title, message_text = f'98堂 账号{idx} 签到异常', raw_html
-        except IndexError:
-            title, message_text = f'98堂 账号{idx} 签到异常', f'正则匹配错误'
-        except Exception as e:
-            title, message_text = f'98堂 账号{idx} 签到异常', f'错误原因：{e}'
-            traceback.print_exc()
+                title, message_text = f'98堂账号{i} 签到异常', raw_html
+    except IndexError:
+        title, message_text = '98堂 签到异常', f'正则匹配错误'
+    except Exception as e:
+        title, message_text = '98堂 签到异常', f'错误原因：{e}'
+        traceback.print_exc()
 
-        # 处理 message 数据
-        message_text = preprocess_text(message_text)
+    # 处理签到结果并推送
+    message_text = preprocess_text(message_text)
+    print(message_text)
+    push_notification(title, message_text)
 
-        # 输出日志
-        print(message_text)
-
-        # 发送通知
-        push_notification(title, message_text)
 
 
 if __name__ == '__main__':
