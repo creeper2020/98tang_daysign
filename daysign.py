@@ -178,9 +178,20 @@ def retrieve_cookies_from_fetch(env: str) -> dict:
             'null': None
         })
         return ans
-    cookie_str = parse_fetch(os.getenv(env))['headers']['cookie']
-    return dict(s.strip().split('=', maxsplit=1) for s in cookie_str.split(';'))
 
+    # 获取环境变量的值
+    fetch_str = os.getenv(env)
+    
+    # 检查环境变量是否为空
+    if not fetch_str:
+        raise ValueError(f"环境变量 '{env}' 未设置或为空，请检查配置")
+
+    # 调试输出，确保fetch字符串非空并检查其格式
+    print(f"环境变量 '{env}' 的值: {fetch_str}")
+
+    # 解析 fetch 请求并返回 cookies
+    cookie_str = parse_fetch(fetch_str)['headers']['cookie']
+    return dict(s.strip().split('=', maxsplit=1) for s in cookie_str.split(';'))
 
 def preprocess_text(text) -> str:
     if 'xml' not in text:
